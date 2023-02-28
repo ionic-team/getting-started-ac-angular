@@ -1,0 +1,7 @@
+{
+  "name": "getting-started-ac-angular",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
