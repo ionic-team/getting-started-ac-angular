@@ -2,6 +2,7 @@ import { Injectable, NgZone } from '@angular/core';
 import { Auth0Provider, AuthConnect, AuthResult, ProviderOptions, TokenType } from '@ionic-enterprise/auth';
 import { Platform } from '@ionic/angular';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { VaultService } from '../vault/vault.service';
 
 const authOptions: ProviderOptions = {
   audience: 'https://io.ionic.demo.ac',
@@ -20,12 +21,11 @@ export class AuthService {
   private isNative;
   private initializing: Promise<void> | undefined;
   private provider = new Auth0Provider();
-  private authResult: AuthResult | undefined;
 
   private authenticationChange: BehaviorSubject<boolean> = new BehaviorSubject(false);
   public authenticationChange$: Observable<boolean>;
 
-  constructor(private platform: Platform, private ngZone: NgZone) {
+  constructor(private platform: Platform, private ngZone: NgZone, private vault: VaultService) {
     this.isNative = platform.is('hybrid');
     this.initialize();
     this.authenticationChange$ = this.authenticationChange.asObservable();
@@ -57,15 +57,17 @@ export class AuthService {
 
   public async login(): Promise<void> {
     await this.initialize();
-    this.authResult = await AuthConnect.login(this.provider, authOptions);
+    const authResult = await AuthConnect.login(this.provider, authOptions);
+    await this.saveAuthResult(authResult);
     this.onAuthChange(await this.isAuthenticated());
   }
 
   public async logout(): Promise<void> {
     await this.initialize();
-    if (this.authResult) {
-      await AuthConnect.logout(this.provider, this.authResult);
-      this.authResult = undefined;
+    const authResult = await this.getAuthResult();
+    if (authResult) {
+      await AuthConnect.logout(this.provider, authResult);
+      await this.saveAuthResult(undefined);
       this.onAuthChange(false);
     }
   }
@@ -83,16 +85,18 @@ export class AuthService {
       } catch (err) {
         null;
       }
+      this.saveAuthResult(newAuthResult);
     }
 
     return newAuthResult;
   }
 
   public async getAuthResult(): Promise<AuthResult | undefined> {
-    if (this.authResult && (await AuthConnect.isAccessTokenExpired(this.authResult))) {
-      this.authResult = await this.refreshAuth(this.authResult);
+    let authResult = await this.vault.getSession();
+    if (authResult && (await AuthConnect.isAccessTokenExpired(authResult))) {
+      authResult = await this.refreshAuth(authResult);
     }
-    return this.authResult;
+    return authResult;
   }
 
   private async onAuthChange(isAuthenticated: boolean): Promise<void> {
@@ -115,6 +119,14 @@ export class AuthService {
       return data?.name;
     }
     return undefined;
+  }
+
+  private async saveAuthResult(authResult: AuthResult | undefined): Promise<void> {
+    if (authResult) {
+      await this.vault.setSession(authResult);
+    } else {
+      await this.vault.clear();
+    }
   }
 
 }
