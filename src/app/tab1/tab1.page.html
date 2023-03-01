@@ -13,5 +13,6 @@
     </ion-toolbar>
   </ion-header>
 
-  <app-explore-container name="Tab 1 page"></app-explore-container>
+  <ion-button [hidden]="(authenticationChange$ | async)" (click)="login()">Login</ion-button>
+  <ion-button [hidden]="!(authenticationChange$ | async)"(click)="logout()">Logout</ion-button>
 </ion-content>
