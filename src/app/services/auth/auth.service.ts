@@ -4,21 +4,13 @@ import { Platform } from '@ionic/angular';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { VaultService } from '../vault/vault.service';
 
-const authOptions: ProviderOptions = {
-  audience: 'https://io.ionic.demo.ac',
-  clientId: 'yLasZNUGkZ19DGEjTmAITBfGXzqbvd00',
-  discoveryUrl: 'https://dev-2uspt-sz.us.auth0.com/.well-known/openid-configuration',
-  logoutUrl: 'http://localhost:8100/login',
-  redirectUri: 'http://localhost:8100/login',
-  scope: 'openid offline_access email picture profile',
-};
-
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
 
   private isNative;
+  private authOptions: ProviderOptions;
   private initializing: Promise<void> | undefined;
   private provider = new Auth0Provider();
 
@@ -27,6 +19,14 @@ export class AuthService {
 
   constructor(private platform: Platform, private ngZone: NgZone, private vault: VaultService) {
     this.isNative = platform.is('hybrid');
+    this.authOptions = {
+      audience: 'https://io.ionic.demo.ac',
+      clientId: 'yLasZNUGkZ19DGEjTmAITBfGXzqbvd00',
+      discoveryUrl: 'https://dev-2uspt-sz.us.auth0.com/.well-known/openid-configuration',
+      logoutUrl: this.isNative ? 'msauth://login' : 'http://localhost:8100/login',
+      redirectUri: this.isNative ? 'msauth://login' : 'http://localhost:8100/login',
+      scope: 'openid offline_access email picture profile',
+    };
     this.initialize();
     this.authenticationChange$ = this.authenticationChange.asObservable();
     this.isAuthenticated().then( authenticated => this.onAuthChange(authenticated));
