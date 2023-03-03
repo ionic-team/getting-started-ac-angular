@@ -47,44 +47,24 @@ ionic cap add android
 ionic cap add ios
 ```
 
-In order to ensure that a `cap sync` is run with each build, add it to the build script in the `package.json` file as such:
+We should do a `cap sync` with each build and ensure that our application is served on port `8100` when we run the development server. Change the scripts in `package.json` to do this:
 
 ```JSON
   "scripts": {
+    ...
+    "start": "ng serve --port=8100",
     "build": "ng build && cap sync",
     ...
   },
 ```
 
-Finally, we're going to update our routes to better conform to what our OISD provider requires. We'll be removing the root level `/tabs` route, and replacing it with `''` like so inside `src/app/tabs/tabs-routing.module.ts`:
+Finally, we're going to update our routes to better conform to what our OIDC provider requires. A typical app has a Login page with a route like `/login` and our OIDC provider expects that we do too. We will get around this by adding a blank login page, which will add `/login` as a route. We will never actually navigate to the page within our app.
 
-```typescript
-const routes: Routes = [
-  {
-    path: '',
-    component: TabsPage,
-    children: [
-      {
-        path: 'login',
-        loadChildren: () => import('../tab1/tab1.module').then(m => m.Tab1PageModule),
-      },
-      {
-        path: 'tab2',
-        loadChildren: () => import('../tab2/tab2.module').then(m => m.Tab2PageModule),
-      },
-      {
-        path: 'tab3',
-        loadChildren: () => import('../tab3/tab3.module').then(m => m.Tab3PageModule)
-      },
-      {
-        path: '',
-        redirectTo: '/login',
-        pathMatch: 'full'
-      }
-    ]
-  }
-];
+```bash
+ionic g page login
 ```
+
+Since this page _may_ display for a short time in the OIDC provider popup tab, it is best to modify the HTML for it to only contain an `ion-content` tag. Open `src/app/login/login.page.html` and remove everything other than the empty `ion-content`.
 
 ## Install Auth Connect
 
@@ -100,7 +80,7 @@ npm install @ionic-enterprise/auth
 
 ## Configure Auth Connect
 
-Our next step is to configure Auth Connect. Create a service named `src/services/auth.service.ts` by using `ionic g service auth` and fill it with the following boilerplate content:
+Our next step is to configure Auth Connect. Create a service named `src/app/services/auth/auth.service.ts` by using `ionic g service services/auth/auth` and fill it with the following boilerplate content:
 
 ```typescript
 import { Injectable } from '@angular/core';
@@ -114,7 +94,7 @@ export class AuthService {
     private isNative;
     private authOptions: ProviderOptions;
 
-    constructor(private platform: Platform) {
+    constructor(platform: Platform) {
         this.isNative = platform.is('hybrid');
         this.authOptions = {
             audience: '',
@@ -162,13 +142,14 @@ Before we can use any `AuthConnect` functions we need to make sure we have perfo
 
 ```typescript
 import { Injectable } from '@angular/core';
-import { ProviderOptions } from '@ionic-enterprise/auth';
+import { AuthConnect, ProviderOptions } from '@ionic-enterprise/auth';
 import { Platform } from '@ionic/angular';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+    private initializing: Promise<void> | undefined;
     private isNative;
     private authOptions: ProviderOptions;
 
@@ -222,13 +203,14 @@ Since we are using Auth0, we will create an `Auth0Provider` inside `src/app/serv
 
 ```typescript
 import { Injectable } from '@angular/core';
-import { Auth0Provider, ProviderOptions } from '@ionic-enterprise/auth';
+import { Auth0Provider, AuthConnevct, ProviderOptions } from '@ionic-enterprise/auth';
 import { Platform } from '@ionic/angular';
 ...
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+    private initializing: Promise<void> | undefined;
     private isNative;
     private provider = new Auth0Provider();
     ...
@@ -254,17 +236,11 @@ import { Platform } from '@ionic/angular';
   providedIn: 'root'
 })
 export class AuthService {
+    private initializing: Promise<void> | undefined;
     private isNative;
-    this.authOptions = {
-        audience: 'https://io.ionic.demo.ac',
-        clientId: 'yLasZNUGkZ19DGEjTmAITBfGXzqbvd00',
-        discoveryUrl: 'https://dev-2uspt-sz.us.auth0.com/.well-known/openid-configuration',
-        logoutUrl: this.isNative ? 'msauth://login' : 'http://localhost:8100/login',
-        redirectUri: this.isNative ? 'msauth://login' : 'http://localhost:8100/login',
-        scope: 'openid offline_access email picture profile',
-    };
     private provider = new Auth0Provider();
-    private authResult: AuthResult | undefined;
+ ▏  private authOptions: ProviderOptions; 
+    private authResult: AuthResult | null = null;
 
     ...
     public async login(): Promise<void> {
@@ -281,7 +257,7 @@ public async logout(): Promise<void> {
     await this.initialize();
     if (this.authResult) {
         await AuthConnect.logout(this.provider, this.authResult);
-        this.authResult = undefined;
+        this.authResult = null;
     }
 }
 ```
@@ -330,13 +306,15 @@ You should be able to login and and logout successfully.
 
 Build the application for a native device and try the login there as well. You should notice that this does not work on your device.
 
-The problem is that we need to let the native device know which application(s) are allowed to handle navigation to the `msauth://` scheme. To do this, we need to modify our `AndroidManifest.xml` and `Info.plist` files <a href="https://ionic.io/docs/auth-connect/install" target="_blank">as noted here</a>. Use `msauth` in place of `$AUTH_URL_SCHEME`.
+The problem is that we need to let the native device know which application(s) are allowed to handle navigation to the `msauth://` scheme. To do this, we need to modify our `android/app/build.gradle` and `ios/App/App/Info.plist` files <a href="https://ionic.io/docs/auth-connect/install" target="_blank">as noted here</a>. In the `Info.plist` file, use `msauth` in place of `$AUTH_URL_SCHEME`.
 
 ### Determine Current Auth Status
 
 Right now, the user is shown both the login and logout buttons, and you don't really know if the user is logged in or not. Let's change that.
 
 A simple strategy to use is if we have an `AuthResult` then we are logged in, otherwise we are not. Add code to do that in `src/app/services/auth.service.ts`. We are going to setup observables to notify listening pages of the change. Ignore the extra complexity with the `getAuthResult()` function. We will expand on that as we go.
+
+We also need to be sure and trigger our `authenticationChange$` when we successfully log in or out of the application.
 
 ```typescript
 import { Injectable, NgZone } from '@angular/core';
@@ -350,7 +328,7 @@ export class AuthService {
     private authenticationChange: BehaviorSubject<boolean> = new BehaviorSubject(false);
     public authenticationChange$: Observable<boolean>;
 
-    constructor(private platform: Platform, private ngZone: NgZone) {
+    constructor(platform: Platform, private ngZone: NgZone) {
         this.isNative = platform.is('hybrid');
         this.authOptions = { ... };
         this.initialize();
@@ -358,18 +336,33 @@ export class AuthService {
         this.isAuthenticated().then( authenticated => this.onAuthChange(authenticated));
     }
     ...
-    private async onAuthChange(isAuthenticated: boolean): Promise<void> {
-        this.ngZone.run(() => {
-            this.authenticationChange.next(isAuthenticated);
-        })
+    public async login(): Promise<void> {
+      await this.initialize();
+      this.authResult = await AuthConnect.login(this.provider, this.authOptions);
+      this.onAuthChange(await this.isAuthenticated());
     }
-    public async getAuthResult(): Promise<AuthResult | undefined> {
-        return this.authResult;
+
+    public async logout(): Promise<void> {
+      await this.initialize();
+      if (this.authResult) {
+        await AuthConnect.logout(this.provider, this.authResult);
+        this.authResult = null;
+        this.onAuthChange(await this.isAuthenticated());
+      }
+    }
+    ...
+    private async onAuthChange(isAuthenticated: boolean): Promise<void> {
+      this.ngZone.run(() => {
+        this.authenticationChange.next(isAuthenticated);
+      })
+    }
+    public async getAuthResult(): Promise<AuthResult | null> {
+      return this.authResult;
     }
 
     public async isAuthenticated(): Promise<boolean> {
-        await this.initialize();
-        return !!(await this.getAuthResult());
+      await this.initialize();
+      return !!(await this.getAuthResult());
     }
 }
 ```
@@ -377,10 +370,13 @@ export class AuthService {
 Setup Tab1Page to listen to this observable by attaching to it in the constructor:
 
 ```typescript
+import { Component } from '@angular/core';
+import { Observable } from 'rxjs';
+import { AuthService } from '../services/auth/auth.service';
 ...
 export class Tab1Page {
 
-  public authenticationChange$: Observable<boolean> | undefined;
+  public authenticationChange$: Observable<boolean>;
 
   constructor(private auth: AuthService) {
     this.authenticationChange$ = auth.authenticationChange$;
@@ -422,13 +418,13 @@ public async getUserName(): Promise<string | undefined> {
     const res = await this.getAuthResult();
     if(res) {
         const data = (await AuthConnect.decodeToken(TokenType.id, res)) as { name: string };
-        return data?.name;
+        return data?.name ;
     }
     return undefined;
 }
 ```
 
-**Note:** the format and data stored in the ID token may changed based on your provider and configuration. Check the documentation and configuration of your own provider for details.
+**Note:** the format and data stored in the ID token may change based on your provider and configuration. Check the documentation and configuration of your own provider for details.
 
 You can use these wherever you need to supply a specific token. For example, if you are accessing a backend API that requires you to include a bearer token (and you probably are if you are using Auth Connect), then you can use the `getAccessToken()` method and <a href="https://github.com/ionic-team/tea-taster-vue/blob/feature/auth-connect/src/use/backend-api.ts#L15-L22" target="_blank">create in interceptor</a> that adds the token.
 
@@ -441,8 +437,8 @@ In a typical OIDC implementation, access tokens are very short lived. In such a 
 Let's add a function to `src/app/services/auth.service.ts` that does the refresh, and then modify `getAuthResult()` to call it when needed.
 
 ```typescript
-public async refreshAuth(authResult: AuthResult): Promise<AuthResult | undefined> {
-    let newAuthResult: AuthResult | undefined;
+public async refreshAuth(authResult: AuthResult): Promise<AuthResult | null> {
+    let newAuthResult: AuthResult | null = null;
     if (await AuthConnect.isRefreshTokenAvailable(authResult)) {
         try {
             newAuthResult = await AuthConnect.refreshSession(this.provider, authResult);
@@ -454,7 +450,7 @@ public async refreshAuth(authResult: AuthResult): Promise<AuthResult | undefined
     return newAuthResult;
 }
 
-public async getAuthResult(): Promise<AuthResult | undefined> {
+public async getAuthResult(): Promise<AuthResult | null> {
     if (this.authResult && (await AuthConnect.isAccessTokenExpired(this.authResult))) {
         this.authResult = await this.refreshAuth(this.authResult);
     }
@@ -480,7 +476,13 @@ For our application we will install identity vault and use it in "secure storage
 npm i @ionic-enterprise/identity-vault
 ```
 
-Next we will create a factory that builds either the actual vault if we are on a device or a browser based "vault" that is suitable for development if we are in the browser. The following code should go in `src/app/services/vault.service.ts`.
+Next we will create a factory that builds either the actual vault if we are on a device or a browser based "vault" that is suitable for development if we are in the browser.
+
+```bash
+ionic g service services/vault/vault
+```
+
+The following code should go in `src/app/services/vault.service.ts`.
 
 ```typescript
 import { Injectable } from '@angular/core';
@@ -523,42 +525,43 @@ Now that we have a factory in place to build our vaults, let's create some funct
     return this.vault.clear();
   }
 
-  public getSession(): Promise<AuthResult | undefined> {
-    return this.vault.getValue(vaultKey) as Promise<AuthResult | undefined>
+  public getSession(): Promise<AuthResult | null> {
+    return this.vault.getValue<AuthResult>(vaultKey);
   }
 
-  public setSession(value: AuthResult | undefined): Promise<void> {
+  public setSession(value: AuthResult): Promise<void> {
     return this.vault.setValue(vaultKey, value);
   }
 ```
 
 Then modify `src/app/services/auth.service.ts` to use the `vault` service. The goal is to no longer store the auth result in a session variable. Instead, we will use the session vault to store the result and retrieve it from the vault as needed.
 
-Remove the `let authResult: AuthResult | undefined;` line and inject your service into the `AuthService`:
+Remove the `private authResult: AuthResult | null = null;` line and inject your service into the `AuthService`:
 
 ```typescript
 import { VaultService } from '../vault/vault.service';
 
-constructor(private platform: Platform, private ngZone: NgZone, private vault: VaultService)
+constructor(platform: Platform, private ngZone: NgZone, private vault: VaultService)
 ```
 
 Create a new function called `saveAuthResult()`:
 
 ```typescript
-private async saveAuthResult(authResult: AuthResult | undefined): Promise<void> {
+private async saveAuthResult(authResult: AuthResult | null): Promise<void> {
     if (authResult) {
         await this.vault.setSession(authResult);
     } else {
         await this.vault.clear();
     }
+    this.onAuthChange(!!authResult);
 }
 ```
 
 Modify `refreshAuth` to save the results of an attempted refresh:
 
 ```typescript
-public async refreshAuth(authResult: AuthResult): Promise<AuthResult | undefined> {
-    let newAuthResult: AuthResult | undefined;
+public async refreshAuth(authResult: AuthResult): Promise<AuthResult | null> {
+    let newAuthResult: AuthResult | null = null;
     if (await AuthConnect.isRefreshTokenAvailable(authResult)) {
         try {
             newAuthResult = await AuthConnect.refreshSession(this.provider, authResult);
@@ -575,7 +578,7 @@ public async refreshAuth(authResult: AuthResult): Promise<AuthResult | undefined
 Modify `getAuthResult()` to obtain the auth result from the vault:
 
 ```typescript
-public async getAuthResult(): Promise<AuthResult | undefined> {
+public async getAuthResult(): Promise<AuthResult | null> {
     let authResult = await this.vault.getSession();
     if (authResult && (await AuthConnect.isAccessTokenExpired(authResult))) {
         authResult = await this.refreshAuth(authResult);
@@ -585,14 +588,13 @@ public async getAuthResult(): Promise<AuthResult | undefined> {
 }
 ```
 
-Finally, modify `login()` and `logout()` to both save the results of the operation accordingly:
+Finally, modify `login()` and `logout()` to both save the results of the operation accordingly. The call to `onAuthChange()` should also be removed from each is it is now centralized in `saveAuthResult()`.
 
 ```typescript
 public async login(): Promise<void> {
     await this.initialize();
     const authResult = await AuthConnect.login(this.provider, authOptions);
     await this.saveAuthResult(authResult);
-    this.onAuthChange(await this.isAuthenticated());
 }
 
 public async logout(): Promise<void> {
@@ -600,8 +602,7 @@ public async logout(): Promise<void> {
     const authResult = await this.getAuthResult();
     if (authResult) {
       await AuthConnect.logout(this.provider, authResult);
-      await this.saveAuthResult(undefined);
-      this.onAuthChange(false);
+      await this.saveAuthResult(null);
     }
 }
 ```

@@ -17,7 +17,7 @@ export class AuthService {
   private authenticationChange: BehaviorSubject<boolean> = new BehaviorSubject(false);
   public authenticationChange$: Observable<boolean>;
 
-  constructor(private platform: Platform, private ngZone: NgZone, private vault: VaultService) {
+  constructor(platform: Platform, private ngZone: NgZone, private vault: VaultService) {
     this.isNative = platform.is('hybrid');
     this.authOptions = {
       audience: 'https://io.ionic.demo.ac',
@@ -57,9 +57,8 @@ export class AuthService {
 
   public async login(): Promise<void> {
     await this.initialize();
-    const authResult = await AuthConnect.login(this.provider, authOptions);
+    const authResult = await AuthConnect.login(this.provider, this.authOptions);
     await this.saveAuthResult(authResult);
-    this.onAuthChange(await this.isAuthenticated());
   }
 
   public async logout(): Promise<void> {
@@ -67,8 +66,7 @@ export class AuthService {
     const authResult = await this.getAuthResult();
     if (authResult) {
       await AuthConnect.logout(this.provider, authResult);
-      await this.saveAuthResult(undefined);
-      this.onAuthChange(false);
+      await this.saveAuthResult(null);
     }
   }
 
@@ -77,8 +75,8 @@ export class AuthService {
     return !!(await this.getAuthResult());
   }
 
-  public async refreshAuth(authResult: AuthResult): Promise<AuthResult | undefined> {
-    let newAuthResult: AuthResult | undefined;
+  public async refreshAuth(authResult: AuthResult): Promise<AuthResult | null> {
+    let newAuthResult: AuthResult | null = null;
     if (await AuthConnect.isRefreshTokenAvailable(authResult)) {
       try {
         newAuthResult = await AuthConnect.refreshSession(this.provider, authResult);
@@ -91,7 +89,7 @@ export class AuthService {
     return newAuthResult;
   }
 
-  public async getAuthResult(): Promise<AuthResult | undefined> {
+  public async getAuthResult(): Promise<AuthResult | null> {
     let authResult = await this.vault.getSession();
     if (authResult && (await AuthConnect.isAccessTokenExpired(authResult))) {
       authResult = await this.refreshAuth(authResult);
@@ -121,12 +119,13 @@ export class AuthService {
     return undefined;
   }
 
-  private async saveAuthResult(authResult: AuthResult | undefined): Promise<void> {
+  private async saveAuthResult(authResult: AuthResult | null): Promise<void> {
     if (authResult) {
       await this.vault.setSession(authResult);
     } else {
       await this.vault.clear();
     }
+    this.onAuthChange(!!authResult);
   }
 
 }

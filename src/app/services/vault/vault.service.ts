@@ -30,11 +30,11 @@ export class VaultService {
     return this.vault.clear();
   }
 
-  public getSession(): Promise<AuthResult | undefined> {
-    return this.vault.getValue(vaultKey) as Promise<AuthResult | undefined>
+  public getSession(): Promise<AuthResult | null> {
+    return this.vault.getValue<AuthResult>(vaultKey);
   }
 
-  public setSession(value: AuthResult | undefined): Promise<void> {
+  public setSession(value: AuthResult): Promise<void> {
     return this.vault.setValue(vaultKey, value);
   }
 }
