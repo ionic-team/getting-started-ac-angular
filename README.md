@@ -144,7 +144,7 @@ Obtaining this information likely takes a little coordination with whoever admin
 Translating that into our configuration object, we now have this:
 
 ```typescript
-const authOptions: ProviderOptions = {
+this.authOptions = {
     audience: 'https://io.ionic.demo.ac',
     clientId: 'yLasZNUGkZ19DGEjTmAITBfGXzqbvd00',
     discoveryUrl: 'https://dev-2uspt-sz.us.auth0.com/.well-known/openid-configuration',
