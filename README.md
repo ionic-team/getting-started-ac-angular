@@ -393,11 +393,15 @@ export class Tab1Page {
 }
 ```
 
-Use this in the layout to display only the Login or the Logout button, depending on the current login status:
+Use this in the layout to display only the Login or the Logout button depending on the current login status:
 
 ```html
-<ion-button [hidden]="(authenticationChange$ | async)" (click)="login()">Login</ion-button>
-<ion-button [hidden]="!(authenticationChange$ | async)"(click)="logout()">Logout</ion-button>
+  <div *ngIf="authenticationChange$ | async; else elseBlock">
+    <ion-button (click)="logout()">Logout</ion-button>
+  </div>
+  <ng-template #elseBlock>
+    <ion-button (click)="login()">Login</ion-button>
+  </ng-template>
 ```
 
 At this point, you should see the Login button if you are not logged in and the Logout button if you are.
