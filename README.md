@@ -203,7 +203,7 @@ Since we are using Auth0, we will create an `Auth0Provider` inside `src/app/serv
 
 ```typescript
 import { Injectable } from '@angular/core';
-import { Auth0Provider, AuthConnevct, ProviderOptions } from '@ionic-enterprise/auth';
+import { Auth0Provider, AuthConnect, ProviderOptions } from '@ionic-enterprise/auth';
 import { Platform } from '@ionic/angular';
 ...
 @Injectable({
