@@ -1,5 +1,3 @@
-# Getting Started with Auth Connect in @ionic/angular
-
 In this tutorial we will walk through the basic setup and use of Ionic's Auth Connect in an `@ionic/angular` application.
 
 In this tutorial, you will learn how to:
@@ -430,10 +428,6 @@ public async getUserName(): Promise<string | undefined> {
 
 **Note:** the format and data stored in the ID token may change based on your provider and configuration. Check the documentation and configuration of your own provider for details.
 
-You can use these wherever you need to supply a specific token. For example, if you are accessing a backend API that requires you to include a bearer token (and you probably are if you are using Auth Connect), then you can use the `getAccessToken()` method and <a href="https://github.com/ionic-team/tea-taster-vue/blob/feature/auth-connect/src/use/backend-api.ts#L15-L22" target="_blank">create in interceptor</a> that adds the token.
-
-We don't need an interceptor for this app, but as a challenge to you, update the Tab1Page to show the current user's name when they are logged in. You could also display the access token if you want (though you would _never_ do that in a real app).
-
 ### Refreshing the Authentication
 
 In a typical OIDC implementation, access tokens are very short lived. In such a case, it is common to use a longer lived refresh token to obtain a new `AuthResult`.
@@ -657,3 +651,4 @@ At this point, you should have a good idea of how Auth Connect and Identity Vaul
 - <a href="https://ionic.io/docs/auth-connect" target="_blank">Auth Connect</a>
 - <a href="https://ionic.io/docs/identity-vault" target="_blank">Identity Vault</a> - check out its <a href="https://ionic.io/docs/identity-vault/getting-started-angular" target="_blank">Getting Started guide</a> as well.
 - <a href="https://github.com/ionic-enterprise/tea-taster-angular/tree/feature/auth-connect" target="_blank">Tea Taster with Auth Connect and Identity Vault</a>
+
