@@ -17,7 +17,7 @@ The source code for the Ionic application created in this tutorial can be found 
 The first step to take is to generate the application:
 
 ```bash
-ionic start getting-started-ac-angular tabs --type=angular
+ionic start getting-started-ac-angular tabs --type=angular-standalone
 ```
 
 Now that the application has been generated, let's also add the iOS and Android platforms.
@@ -627,17 +627,17 @@ export const authGuard: CanActivateFn = (route: ActivatedRouteSnapshot, state: R
 
 ```
 
-Then add some metadata to the `tab2` and `tab3` routes inside `src/app/tabs/tabs-routing.module.ts` to indicate that they require authentication:
+Then add some metadata to the `tab2` and `tab3` routes inside `src/app/tabs/tabs.routes.ts` to indicate that they require authentication:
 
 ```typescript
       {
         path: 'tab2',
-        loadChildren: () => import('../tab2/tab2.module').then(m => m.Tab2PageModule),
+        loadComponent: () => import('../tab2/tab2.page').then(m => m.Tab2Page),
         canActivate: [authGuard]
       },
       {
         path: 'tab3',
-        loadChildren: () => import('../tab3/tab3.module').then(m => m.Tab3PageModule),
+        loadComponent: () => import('../tab3/tab3.page').then(m => m.Tab3Page),
         canActivate: [authGuard]
       },
 ```
