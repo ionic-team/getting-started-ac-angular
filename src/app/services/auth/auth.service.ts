@@ -1,35 +1,45 @@
 import { Injectable, NgZone } from '@angular/core';
-import { Auth0Provider, AuthConnect, AuthResult, ProviderOptions, TokenType } from '@ionic-enterprise/auth';
+import {
+  Auth0Provider,
+  AuthConnect,
+  AuthResult,
+  ProviderOptions,
+  TokenType,
+} from '@ionic-enterprise/auth';
 import { Platform } from '@ionic/angular';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { VaultService } from '../vault/vault.service';
+import { baseConfig, mobileConfig, webConfig } from '../../../config';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthService {
-
   private isNative;
   private authOptions: ProviderOptions;
   private initializing: Promise<void> | undefined;
   private provider = new Auth0Provider();
 
-  private authenticationChange: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  private authenticationChange: BehaviorSubject<boolean> = new BehaviorSubject(
+    false
+  );
   public authenticationChange$: Observable<boolean>;
 
-  constructor(platform: Platform, private ngZone: NgZone, private vault: VaultService) {
+  constructor(
+    platform: Platform,
+    private ngZone: NgZone,
+    private vault: VaultService
+  ) {
     this.isNative = platform.is('hybrid');
     this.authOptions = {
-      audience: 'https://io.ionic.demo.ac',
-      clientId: 'yLasZNUGkZ19DGEjTmAITBfGXzqbvd00',
-      discoveryUrl: 'https://dev-2uspt-sz.us.auth0.com/.well-known/openid-configuration',
-      logoutUrl: this.isNative ? 'msauth://login' : 'http://localhost:8100/login',
-      redirectUri: this.isNative ? 'msauth://login' : 'http://localhost:8100/login',
-      scope: 'openid offline_access email picture profile',
+      ...baseConfig,
+      ...(this.isNative ? mobileConfig : webConfig),
     };
     this.initialize();
     this.authenticationChange$ = this.authenticationChange.asObservable();
-    this.isAuthenticated().then( authenticated => this.onAuthChange(authenticated));
+    this.isAuthenticated().then((authenticated) =>
+      this.onAuthChange(authenticated)
+    );
   }
 
   private setup(): Promise<void> {
@@ -48,7 +58,7 @@ export class AuthService {
 
   private initialize(): Promise<void> {
     if (!this.initializing) {
-      this.initializing = new Promise( resolve => {
+      this.initializing = new Promise((resolve) => {
         this.setup().then(() => resolve());
       });
     }
@@ -79,7 +89,10 @@ export class AuthService {
     let newAuthResult: AuthResult | null = null;
     if (await AuthConnect.isRefreshTokenAvailable(authResult)) {
       try {
-        newAuthResult = await AuthConnect.refreshSession(this.provider, authResult);
+        newAuthResult = await AuthConnect.refreshSession(
+          this.provider,
+          authResult
+        );
       } catch (err) {
         null;
       }
@@ -100,20 +113,22 @@ export class AuthService {
   private async onAuthChange(isAuthenticated: boolean): Promise<void> {
     this.ngZone.run(() => {
       this.authenticationChange.next(isAuthenticated);
-    })
+    });
   }
 
   public async getAccessToken(): Promise<string | undefined> {
     await this.initialize();
     const res = await this.getAuthResult();
-    return res?.accessToken;  
+    return res?.accessToken;
   }
 
   public async getUserName(): Promise<string | undefined> {
     await this.initialize();
     const res = await this.getAuthResult();
-    if(res) {
-      const data = (await AuthConnect.decodeToken(TokenType.id, res)) as { name: string };
+    if (res) {
+      const data = (await AuthConnect.decodeToken(TokenType.id, res)) as {
+        name: string;
+      };
       return data?.name;
     }
     return undefined;
@@ -127,5 +142,4 @@ export class AuthService {
     }
     this.onAuthChange(!!authResult);
   }
-
 }
