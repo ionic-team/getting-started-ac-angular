@@ -45,6 +45,8 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID can be used to unlock your session.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
